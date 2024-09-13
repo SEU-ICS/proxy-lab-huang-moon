@@ -18,26 +18,26 @@ int find_highest_lru(); // 查找最大LRU值
 
 /* 读写锁 */
 struct LockRW {
-    sem_t read_lock;    // 读锁
-    sem_t write_lock;   // 写锁
-    int reader_counter; // 读者计数器
+    sem_t read_lock;    
+    sem_t write_lock;   
+    int reader_counter;
 };
 
 /* LRU缓存 */
 struct CacheItem {
-    int lru_count;                     // LRU计数
-    char uri_data[MAXLINE];            // 缓存的URI
-    char data_block[MAX_OBJECT_SIZE];  // 缓存的数据
+    int lru_count;                    
+    char uri_data[MAXLINE];           
+    char data_block[MAX_OBJECT_SIZE];  
 };
 
 /* 全局缓存数组和锁 */
-struct CacheItem cache_store[CACHE_CAPACITY];  // 缓存条目数组
-struct LockRW *lock_rw; // 全局读写锁
+struct CacheItem cache_store[CACHE_CAPACITY]; 
+struct LockRW *lock_rw;
 
 /* 函数声明 */
-void init_rw_lock(); // 初始化读写锁
-char *get_from_cache(const char *uri_req); // 从缓存中获取数据
-void save_to_cache(const char *data, const char *uri_req); // 向缓存写入数据
+void init_rw_lock(); 
+char *get_from_cache(const char *uri_req); 
+void save_to_cache(const char *data, const char *uri_req); 
 
 int main(int argc, char **argv)
 {
@@ -76,9 +76,9 @@ void *worker_routine(void *client_sock_ptr)
 {
     int client_socket = *((int *)client_sock_ptr);
     Pthread_detach(pthread_self());
-    Free(client_sock_ptr); // 释放分配的客户端套接字指针
-    process_request(client_socket); // 处理客户端请求
-    Close(client_socket); // 关闭客户端连接
+    Free(client_sock_ptr); 
+    process_request(client_socket); 
+    Close(client_socket); 
     return NULL;
 }
 
@@ -130,7 +130,7 @@ int analyze_uri(const char *request_uri, char *server_host, char *file_path, cha
     strncpy(server_host, host_start, host_end - host_start);
 
     const char *port_or_path = host_end + 1; 
-    if (*host_end == ':') { // 如果有端口号
+    if (*host_end == ':') { 
         host_end++;
         port_or_path = strstr(host_start, "/"); 
         strncpy(server_port, host_end, port_or_path - host_end); 
@@ -167,7 +167,7 @@ void handle_and_forward_headers(rio_t *server_read, int client_sock)
         printf("%s", header_buffer);
         Rio_writen(client_sock, header_buffer, strlen(header_buffer));
     }
-    Rio_writen(client_sock, header_buffer, strlen(header_buffer)); // 最后写入空行
+    Rio_writen(client_sock, header_buffer, strlen(header_buffer)); 
 }
 
 /* 从服务器获取数据并转发给客户端，同时将数据写入缓存 */
@@ -179,18 +179,18 @@ void transmit_data(int server_sock, int client_sock, const char *cache_uri)
 
     Rio_readinitb(&server_rio, server_sock);
     while ((read_size = Rio_readlineb(&server_rio, transfer_buffer, MAXLINE)) != 0) {
-        Rio_writen(client_sock, transfer_buffer, read_size); // 将服务器数据转发给客户端
+        Rio_writen(client_sock, transfer_buffer, read_size);
 
         /* 如果数据大小适合缓存，则将其保存到缓存中 */
         if (read_size + total_bytes <= MAX_OBJECT_SIZE) {
             sprintf(content_buffer + total_bytes, "%s", transfer_buffer);
             total_bytes += read_size;
         } else {
-            total_bytes = MAX_OBJECT_SIZE + 1; // 数据过大，不适合缓存
+            total_bytes = MAX_OBJECT_SIZE + 1; 
         }
     }
 
-    save_to_cache(content_buffer, cache_uri); // 将数据保存到缓存
+    save_to_cache(content_buffer, cache_uri);
 }
 
 /*-----缓存操作-----*/
@@ -198,20 +198,20 @@ void transmit_data(int server_sock, int client_sock, const char *cache_uri)
 /* 初始化读写锁 */
 void init_rw_lock() 
 {
-    lock_rw->reader_counter = 0; // 初始化读者计数器
-    sem_init(&lock_rw->read_lock, 0, 1); // 初始化读锁
-    sem_init(&lock_rw->write_lock, 0, 1); // 初始化写锁
+    lock_rw->reader_counter = 0; 
+    sem_init(&lock_rw->read_lock, 0, 1); 
+    sem_init(&lock_rw->write_lock, 0, 1);
 }
 
 /* 将数据保存到缓存 */
 void save_to_cache(const char *data, const char *uri_req)
 {
-    sem_wait(&lock_rw->write_lock); // 写锁定
+    sem_wait(&lock_rw->write_lock); 
     int slot;
 
     /* 查找可用的缓存槽位 */
     for (slot = 0; slot < CACHE_CAPACITY; slot++) {
-        if (cache_store[slot].lru_count == 0) { // 找到一个空槽位
+        if (cache_store[slot].lru_count == 0) { 
             break;
         }
     }
@@ -228,10 +228,10 @@ void save_to_cache(const char *data, const char *uri_req)
     }
 
     /* 将数据保存到缓存 */
-    cache_store[slot].lru_count = find_highest_lru() + 1; // 更新LRU计数
+    cache_store[slot].lru_count = find_highest_lru() + 1; 
     strcpy(cache_store[slot].uri_data, uri_req); 
     strcpy(cache_store[slot].data_block, data); 
-    sem_post(&lock_rw->write_lock); // 释放写锁
+    sem_post(&lock_rw->write_lock); 
 }
 
 /* 查找当前缓存中最高的LRU值 */
@@ -249,12 +249,12 @@ int find_highest_lru()
 /* 从缓存中获取数据 */
 char *get_from_cache(const char *uri_req)
 {
-    sem_wait(&lock_rw->read_lock); // 获取读锁
+    sem_wait(&lock_rw->read_lock);
     if (lock_rw->reader_counter == 1) {
-        sem_wait(&lock_rw->write_lock); // 第一个读者需要锁定写
+        sem_wait(&lock_rw->write_lock); 
     }
     lock_rw->reader_counter++;
-    sem_post(&lock_rw->read_lock); // 释放读锁
+    sem_post(&lock_rw->read_lock);
 
     char *cached_result = NULL;
     /* 查找缓存中的数据 */
@@ -262,16 +262,16 @@ char *get_from_cache(const char *uri_req)
         if (strcmp(uri_req, cache_store[i].uri_data) == 0) {
             cached_result = (char *)Malloc(strlen(cache_store[i].data_block));
             strcpy(cached_result, cache_store[i].data_block);
-            cache_store[i].lru_count = find_highest_lru() + 1; // 更新LRU计数
+            cache_store[i].lru_count = find_highest_lru() + 1; 
             break;
         }
     }
 
-    sem_wait(&lock_rw->read_lock); // 获取读锁
+    sem_wait(&lock_rw->read_lock); 
     lock_rw->reader_counter--;
     if (lock_rw->reader_counter == 0) {
-        sem_post(&lock_rw->write_lock); // 最后一个读者释放写锁
+        sem_post(&lock_rw->write_lock); 
     }
-    sem_post(&lock_rw->read_lock); // 释放读锁
+    sem_post(&lock_rw->read_lock); 
     return cached_result;
 }
